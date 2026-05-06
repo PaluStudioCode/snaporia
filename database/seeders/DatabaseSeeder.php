@@ -23,11 +23,11 @@ class DatabaseSeeder extends Seeder
     {
         DB::statement('SET FOREIGN_KEY_CHECKS=0');
 
-        Transaction::truncate();
-        OrderItem::truncate();
-        Order::truncate();
-        Photo::truncate();
-        Event::truncate();
+        // Transaction::truncate();
+        // OrderItem::truncate();
+        // Order::truncate();
+        // Photo::truncate();
+        // Event::truncate();
         Setting::truncate();
         User::truncate();
 
@@ -44,49 +44,49 @@ class DatabaseSeeder extends Seeder
                 ]));
             }
 
-            foreach ($this->events() as $event) {
-                Event::create(array_merge($event, [
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]));
-            }
+            // foreach ($this->events() as $event) {
+            //     Event::create(array_merge($event, [
+            //         'created_at' => $now,
+            //         'updated_at' => $now,
+            //     ]));
+            // }
 
-            foreach ($this->photos() as $photo) {
-                Photo::create(array_merge($photo, [
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]));
+            // foreach ($this->photos() as $photo) {
+            //     Photo::create(array_merge($photo, [
+            //         'created_at' => $now,
+            //         'updated_at' => $now,
+            //     ]));
 
-                $this->putDummyPhoto($photo['original_path']);
-                $this->putDummyPhoto($photo['watermarked_path']);
-            }
+            //     $this->putDummyPhoto($photo['original_path']);
+            //     $this->putDummyPhoto($photo['watermarked_path']);
+            // }
 
-            foreach ($this->orders() as $order) {
-                Order::create(array_merge($order, [
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]));
-            }
+            // foreach ($this->orders() as $order) {
+            //     Order::create(array_merge($order, [
+            //         'created_at' => $now,
+            //         'updated_at' => $now,
+            //     ]));
+            // }
 
-            foreach ($this->orderItems() as $item) {
-                OrderItem::create(array_merge($item, [
-                    'created_at' => $now,
-                ]));
-            }
+            // foreach ($this->orderItems() as $item) {
+            //     OrderItem::create(array_merge($item, [
+            //         'created_at' => $now,
+            //     ]));
+            // }
 
-            foreach ($this->transactions() as $transaction) {
-                Transaction::create(array_merge($transaction, [
-                    'payload' => [
-                        'transaction_status' => $transaction['status'],
-                        'order_id' => $transaction['midtrans_order_id'],
-                        'gross_amount' => (string) $transaction['gross_amount'],
-                        'payment_type' => $transaction['payment_type'],
-                        'fraud_status' => $transaction['fraud_status'],
-                    ],
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]));
-            }
+            // foreach ($this->transactions() as $transaction) {
+            //     Transaction::create(array_merge($transaction, [
+            //         'payload' => [
+            //             'transaction_status' => $transaction['status'],
+            //             'order_id' => $transaction['midtrans_order_id'],
+            //             'gross_amount' => (string) $transaction['gross_amount'],
+            //             'payment_type' => $transaction['payment_type'],
+            //             'fraud_status' => $transaction['fraud_status'],
+            //         ],
+            //         'created_at' => $now,
+            //         'updated_at' => $now,
+            //     ]));
+            // }
 
             foreach ($this->settings() as $setting) {
                 Setting::create(array_merge($setting, [
@@ -102,13 +102,13 @@ class DatabaseSeeder extends Seeder
         return [
             ['id' => 1, 'name' => 'Super Admin', 'email' => 'superadmin@snaporia.test', 'password' => 'password', 'role' => 'super_admin', 'is_active' => true],
             ['id' => 2, 'name' => 'Arka Visual', 'email' => 'arka@snaporia.test', 'password' => 'password', 'role' => 'admin', 'is_active' => true],
-            ['id' => 3, 'name' => 'Lensa Cerita Studio', 'email' => 'lensa@snaporia.test', 'password' => 'password', 'role' => 'admin', 'is_active' => true],
-            ['id' => 4, 'name' => 'Momentika Photo', 'email' => 'momentika@snaporia.test', 'password' => 'password', 'role' => 'admin', 'is_active' => true],
+            // ['id' => 3, 'name' => 'Lensa Cerita Studio', 'email' => 'lensa@snaporia.test', 'password' => 'password', 'role' => 'admin', 'is_active' => true],
+            // ['id' => 4, 'name' => 'Momentika Photo', 'email' => 'momentika@snaporia.test', 'password' => 'password', 'role' => 'admin', 'is_active' => true],
             ['id' => 5, 'name' => 'Rani Amelia', 'email' => 'rani@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => true],
-            ['id' => 6, 'name' => 'Dimas Pratama', 'email' => 'dimas@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => true],
-            ['id' => 7, 'name' => 'Sinta Maharani', 'email' => 'sinta@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => true],
-            ['id' => 8, 'name' => 'Bima Wardana', 'email' => 'bima@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => true],
-            ['id' => 9, 'name' => 'Visitor Nonaktif', 'email' => 'inactive@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => false],
+            // ['id' => 6, 'name' => 'Dimas Pratama', 'email' => 'dimas@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => true],
+            // ['id' => 7, 'name' => 'Sinta Maharani', 'email' => 'sinta@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => true],
+            // ['id' => 8, 'name' => 'Bima Wardana', 'email' => 'bima@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => true],
+            // ['id' => 9, 'name' => 'Visitor Nonaktif', 'email' => 'inactive@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => false],
         ];
     }
 
