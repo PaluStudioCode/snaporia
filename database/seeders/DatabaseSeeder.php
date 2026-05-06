@@ -11,7 +11,6 @@ use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class DatabaseSeeder extends Seeder
@@ -21,18 +20,6 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        DB::statement('SET FOREIGN_KEY_CHECKS=0');
-
-        // Transaction::truncate();
-        // OrderItem::truncate();
-        // Order::truncate();
-        // Photo::truncate();
-        // Event::truncate();
-        Setting::truncate();
-        User::truncate();
-
-        DB::statement('SET FOREIGN_KEY_CHECKS=1');
-
         Model::unguarded(function (): void {
             $now = now();
 
@@ -88,12 +75,12 @@ class DatabaseSeeder extends Seeder
             //     ]));
             // }
 
-            foreach ($this->settings() as $setting) {
-                Setting::create(array_merge($setting, [
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]));
-            }
+            // foreach ($this->settings() as $setting) {
+            //     Setting::create(array_merge($setting, [
+            //         'created_at' => $now,
+            //         'updated_at' => $now,
+            //     ]));
+            // }
         });
     }
 
@@ -102,13 +89,13 @@ class DatabaseSeeder extends Seeder
         return [
             ['id' => 1, 'name' => 'Super Admin', 'email' => 'superadmin@snaporia.test', 'password' => 'password', 'role' => 'super_admin', 'is_active' => true],
             ['id' => 2, 'name' => 'Arka Visual', 'email' => 'arka@snaporia.test', 'password' => 'password', 'role' => 'admin', 'is_active' => true],
-            // ['id' => 3, 'name' => 'Lensa Cerita Studio', 'email' => 'lensa@snaporia.test', 'password' => 'password', 'role' => 'admin', 'is_active' => true],
-            // ['id' => 4, 'name' => 'Momentika Photo', 'email' => 'momentika@snaporia.test', 'password' => 'password', 'role' => 'admin', 'is_active' => true],
+            ['id' => 3, 'name' => 'Lensa Cerita Studio', 'email' => 'lensa@snaporia.test', 'password' => 'password', 'role' => 'admin', 'is_active' => true],
+            ['id' => 4, 'name' => 'Momentika Photo', 'email' => 'momentika@snaporia.test', 'password' => 'password', 'role' => 'admin', 'is_active' => true],
             ['id' => 5, 'name' => 'Rani Amelia', 'email' => 'rani@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => true],
-            // ['id' => 6, 'name' => 'Dimas Pratama', 'email' => 'dimas@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => true],
-            // ['id' => 7, 'name' => 'Sinta Maharani', 'email' => 'sinta@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => true],
-            // ['id' => 8, 'name' => 'Bima Wardana', 'email' => 'bima@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => true],
-            // ['id' => 9, 'name' => 'Visitor Nonaktif', 'email' => 'inactive@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => false],
+            ['id' => 6, 'name' => 'Dimas Pratama', 'email' => 'dimas@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => true],
+            ['id' => 7, 'name' => 'Sinta Maharani', 'email' => 'sinta@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => true],
+            ['id' => 8, 'name' => 'Bima Wardana', 'email' => 'bima@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => true],
+            ['id' => 9, 'name' => 'Visitor Nonaktif', 'email' => 'inactive@example.test', 'password' => 'password', 'role' => 'visitor', 'is_active' => false],
         ];
     }
 

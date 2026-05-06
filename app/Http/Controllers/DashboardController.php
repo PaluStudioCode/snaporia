@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Event;
 use App\Models\Order;
 use App\Models\Photo;
+use App\Models\Setting;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -15,6 +16,8 @@ class DashboardController extends Controller
 {
     public function superAdmin(): Response
     {
+        $tableLimit = $this->dashboardTableLimit();
+
         return Inertia::render('Dashboard', [
             'dashboardRole' => User::ROLE_SUPER_ADMIN,
             'stats' => [
@@ -28,7 +31,7 @@ class DashboardController extends Controller
             ],
             'recentTransactions' => $this->transactionQuery()
                 ->latest('id')
-                ->take(5)
+                ->take($tableLimit)
                 ->get()
                 ->map(fn (Transaction $transaction) => $this->transactionPayload($transaction, route('super-admin.transactions.show', $transaction))),
             'recentOrders' => [],
@@ -36,7 +39,7 @@ class DashboardController extends Controller
                 ->with('admin:id,name')
                 ->withCount('photos')
                 ->latest('id')
-                ->take(5)
+                ->take($tableLimit)
                 ->get()
                 ->map(fn (Event $event) => $this->eventPayload($event, true)),
             'quickLinks' => [
@@ -50,6 +53,7 @@ class DashboardController extends Controller
     public function admin(Request $request): Response
     {
         $adminId = $request->user()->id;
+        $tableLimit = $this->dashboardTableLimit();
 
         return Inertia::render('Dashboard', [
             'dashboardRole' => User::ROLE_ADMIN,
@@ -65,7 +69,7 @@ class DashboardController extends Controller
             'recentTransactions' => $this->transactionQuery()
                 ->whereHas('order.event', fn ($query) => $query->where('admin_id', $adminId))
                 ->latest('id')
-                ->take(5)
+                ->take($tableLimit)
                 ->get()
                 ->map(fn (Transaction $transaction) => $this->transactionPayload($transaction, route('admin.transactions.show', $transaction))),
             'recentOrders' => [],
@@ -73,7 +77,7 @@ class DashboardController extends Controller
                 ->where('admin_id', $adminId)
                 ->withCount('photos')
                 ->latest('id')
-                ->take(5)
+                ->take($tableLimit)
                 ->get()
                 ->map(fn (Event $event) => $this->eventPayload($event)),
             'quickLinks' => [
@@ -84,40 +88,17 @@ class DashboardController extends Controller
         ]);
     }
 
-    public function visitor(Request $request): Response
-    {
-        $userId = $request->user()->id;
-
-        return Inertia::render('Dashboard', [
-            'dashboardRole' => User::ROLE_VISITOR,
-            'stats' => [
-                $this->stat('Order Saya', Order::query()->where('user_id', $userId)->count(), 'file'),
-                $this->stat('Pending', Order::query()->where('user_id', $userId)->where('status', Order::STATUS_PENDING)->count(), 'clock'),
-                $this->stat('Paid', Order::query()->where('user_id', $userId)->where('status', Order::STATUS_PAID)->count(), 'check'),
-                $this->stat('Total Belanja', (float) Order::query()->where('user_id', $userId)->where('status', Order::STATUS_PAID)->sum('total_amount'), 'banknote', 'currency'),
-            ],
-            'recentOrders' => Order::query()
-                ->with(['event:id,name,date,location'])
-                ->withCount('items')
-                ->where('user_id', $userId)
-                ->latest('id')
-                ->take(5)
-                ->get()
-                ->map(fn (Order $order) => $this->orderPayload($order)),
-            'recentTransactions' => [],
-            'recentEvents' => [],
-            'quickLinks' => [
-                ['label' => 'Jelajah Event', 'href' => route('events.index'), 'icon' => 'calendar'],
-                ['label' => 'Riwayat Pembelian', 'href' => route('visitor.orders.index'), 'icon' => 'file'],
-                ['label' => 'Download Saya', 'href' => route('visitor.downloads.index'), 'icon' => 'download'],
-            ],
-        ]);
-    }
-
     private function transactionQuery()
     {
         return Transaction::query()
             ->with(['order.user:id,name,email', 'order.event.admin:id,name', 'order.event:id,admin_id,name,date,location']);
+    }
+
+    private function dashboardTableLimit(): int
+    {
+        return (int) Setting::query()
+            ->where('key', 'dashboard_table_per_page')
+            ->value('value') ?: 20;
     }
 
     private function stat(string $label, int|float $value, string $icon, string $format = 'number'): array
@@ -148,26 +129,6 @@ class DashboardController extends Controller
             'admin' => $transaction->order->event->admin ? [
                 'name' => $transaction->order->event->admin->name,
             ] : null,
-        ];
-    }
-
-    private function orderPayload(Order $order): array
-    {
-        return [
-            'id' => $order->id,
-            'order_code' => $order->order_code,
-            'type' => $order->type,
-            'status' => $order->status,
-            'total_amount' => (float) $order->total_amount,
-            'items_count' => $order->items_count,
-            'created_at' => $order->created_at?->toIso8601String(),
-            'paid_at' => $order->paid_at?->toIso8601String(),
-            'url' => route('visitor.orders.show', $order),
-            'event' => [
-                'name' => $order->event->name,
-                'date' => $order->event->date?->toDateString(),
-                'location' => $order->event->location,
-            ],
         ];
     }
 

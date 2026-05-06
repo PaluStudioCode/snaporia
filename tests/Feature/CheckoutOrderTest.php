@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Contracts\PaymentGateway;
 use App\Models\Event;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Photo;
+use App\Models\Setting;
+use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -85,6 +88,82 @@ class CheckoutOrderTest extends TestCase
         ]);
     }
 
+    public function test_checkout_pending_expiry_uses_super_admin_setting(): void
+    {
+        $this->travelTo('2026-04-29 10:00:00');
+
+        Setting::create([
+            'key' => 'payment_pending_hours',
+            'value' => '6',
+            'description' => 'Fixture setting',
+        ]);
+
+        $visitor = User::factory()->create(['role' => User::ROLE_VISITOR]);
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $event = $this->makeEvent($admin);
+        $photo = $this->makePhoto($event);
+
+        $this->actingAs($visitor)
+            ->post(route('checkout.single.store'), [
+                'photos' => [$photo->id],
+            ])
+            ->assertRedirect();
+
+        $order = Order::query()->firstOrFail();
+
+        $this->assertSame('2026-04-29 16:00:00', $order->expires_at->format('Y-m-d H:i:s'));
+    }
+
+    public function test_json_single_checkout_creates_order_and_midtrans_payment_without_redirect(): void
+    {
+        $this->app->instance(PaymentGateway::class, new class implements PaymentGateway
+        {
+            public function createTransaction(Order $order, string $midtransOrderId): array
+            {
+                return [
+                    'midtrans_order_id' => $midtransOrderId,
+                    'snap_token' => 'snap-token-checkout',
+                    'payment_url' => 'https://app.sandbox.midtrans.com/snap/v2/vtweb/snap-token-checkout',
+                    'payment_type' => null,
+                    'gross_amount' => $order->total_amount,
+                    'status' => 'pending',
+                    'fraud_status' => null,
+                    'expires_at' => $order->expires_at,
+                    'payload' => ['token' => 'snap-token-checkout'],
+                ];
+            }
+
+            public function status(Transaction $transaction): array
+            {
+                return [];
+            }
+        });
+
+        $visitor = User::factory()->create(['role' => User::ROLE_VISITOR]);
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $event = $this->makeEvent($admin, ['price_per_photo' => 25000]);
+        $photo = $this->makePhoto($event, ['filename' => 'wisuda-001.jpg']);
+
+        $this->actingAs($visitor)
+            ->postJson(route('checkout.single.store'), [
+                'photos' => [$photo->id],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('checkout.mode', 'order')
+            ->assertJsonPath('checkout.status', Order::STATUS_PENDING)
+            ->assertJsonPath('payment.snap_token', 'snap-token-checkout');
+
+        $order = Order::query()->firstOrFail();
+
+        $this->assertDatabaseHas('transactions', [
+            'order_id' => $order->id,
+            'snap_token' => 'snap-token-checkout',
+            'status' => 'pending',
+        ]);
+
+        $this->assertStringStartsWith('MT-'.$order->order_code.'-'.$order->id.'-', Transaction::query()->firstOrFail()->midtrans_order_id);
+    }
+
     public function test_package_checkout_creates_pending_order_for_all_event_photos(): void
     {
         $visitor = User::factory()->create(['role' => User::ROLE_VISITOR]);
@@ -117,6 +196,94 @@ class CheckoutOrderTest extends TestCase
             'photo_id' => $secondPhoto->id,
             'price' => 0,
         ]);
+    }
+
+    public function test_package_checkout_uses_paid_single_photos_as_credit(): void
+    {
+        $visitor = User::factory()->create(['role' => User::ROLE_VISITOR]);
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $event = $this->makeEvent($admin, [
+            'price_per_photo' => 25000,
+            'price_package' => 100000,
+        ]);
+        $firstPhoto = $this->makePhoto($event, ['filename' => 'event-001.jpg']);
+        $secondPhoto = $this->makePhoto($event, ['filename' => 'event-002.jpg', 'sort_order' => 2]);
+        $this->makePhoto($event, ['filename' => 'event-003.jpg', 'sort_order' => 3]);
+        $paidSingle = $this->makePaidOrder($visitor, $event, Order::TYPE_SINGLE);
+        OrderItem::create([
+            'order_id' => $paidSingle->id,
+            'photo_id' => $firstPhoto->id,
+            'price' => 25000,
+        ]);
+        OrderItem::create([
+            'order_id' => $paidSingle->id,
+            'photo_id' => $secondPhoto->id,
+            'price' => 25000,
+        ]);
+
+        $this->actingAs($visitor)
+            ->get(route('checkout.package.show', $event))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Checkout/Show')
+                ->where('checkout.mode', 'preview')
+                ->where('checkout.type', Order::TYPE_PACKAGE)
+                ->where('checkout.total_amount', 50000)
+                ->where('checkout.pricing.package_price', 100000)
+                ->where('checkout.pricing.single_purchase_credit', 50000)
+                ->where('checkout.pricing.purchased_photos_count', 2)
+                ->where('checkout.pricing.purchased_photos.0.filename', 'event-001.jpg')
+            );
+
+        $response = $this->actingAs($visitor)
+            ->post(route('checkout.package.store', $event));
+
+        $packageOrder = Order::query()
+            ->where('type', Order::TYPE_PACKAGE)
+            ->firstOrFail();
+
+        $response->assertRedirect(route('checkout.orders.show', $packageOrder));
+        $this->assertSame('50000.00', $packageOrder->total_amount);
+        $this->assertSame(Order::STATUS_PENDING, $packageOrder->status);
+    }
+
+    public function test_package_checkout_becomes_paid_when_single_photo_credit_covers_package_price(): void
+    {
+        $visitor = User::factory()->create(['role' => User::ROLE_VISITOR]);
+        $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+        $event = $this->makeEvent($admin, [
+            'price_per_photo' => 25000,
+            'price_package' => 50000,
+        ]);
+        $firstPhoto = $this->makePhoto($event, ['filename' => 'event-001.jpg']);
+        $secondPhoto = $this->makePhoto($event, ['filename' => 'event-002.jpg', 'sort_order' => 2]);
+        $paidSingle = $this->makePaidOrder($visitor, $event, Order::TYPE_SINGLE);
+        OrderItem::create([
+            'order_id' => $paidSingle->id,
+            'photo_id' => $firstPhoto->id,
+            'price' => 25000,
+        ]);
+        OrderItem::create([
+            'order_id' => $paidSingle->id,
+            'photo_id' => $secondPhoto->id,
+            'price' => 25000,
+        ]);
+
+        $this->actingAs($visitor)
+            ->postJson(route('checkout.package.store', $event))
+            ->assertCreated()
+            ->assertJsonPath('checkout.total_amount', 0)
+            ->assertJsonPath('checkout.status', Order::STATUS_PAID)
+            ->assertJsonPath('payment', null);
+
+        $packageOrder = Order::query()
+            ->where('type', Order::TYPE_PACKAGE)
+            ->firstOrFail();
+
+        $this->assertSame('0.00', $packageOrder->total_amount);
+        $this->assertSame(Order::STATUS_PAID, $packageOrder->status);
+        $this->assertNotNull($packageOrder->paid_at);
+        $this->assertDatabaseCount('transactions', 0);
     }
 
     public function test_single_checkout_rejects_photos_from_different_events(): void

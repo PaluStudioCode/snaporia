@@ -1,8 +1,9 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { Link, useForm, usePage } from '@inertiajs/vue3';
-import { CheckCircle2, FileImage, UploadCloud, XCircle } from 'lucide-vue-next';
+import { CheckCircle2, FileImage, UploadCloud, X, XCircle } from 'lucide-vue-next';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import Breadcrumbs from '@/Components/Breadcrumbs.vue';
 import EmptyState from '@/Components/EmptyState.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
@@ -64,6 +65,15 @@ const chooseFiles = (event) => {
     form.photos = selectedFiles.value;
 };
 
+const removeFile = (index) => {
+    selectedFiles.value = selectedFiles.value.filter((_, fileIndex) => fileIndex !== index);
+    form.photos = selectedFiles.value;
+
+    if (!selectedFiles.value.length && fileInput.value) {
+        fileInput.value.value = '';
+    }
+};
+
 const submit = () => {
     form.post(route('admin.photos.store'), {
         forceFormData: true,
@@ -85,7 +95,7 @@ const submit = () => {
         <template #header>
             <div>
                 <h1 class="font-heading text-xl font-semibold text-ink">Upload Foto</h1>
-                <p class="mt-1 text-sm text-ink-muted">Upload batch ke event milik Anda dan buat preview watermark otomatis.</p>
+                <Breadcrumbs :items="[{ label: 'Dashboard', href: route('dashboard') }, { label: 'Foto Saya', href: route('admin.photos.index') }, { label: 'Upload Foto' }]" />
             </div>
         </template>
 
@@ -107,7 +117,7 @@ const submit = () => {
                     <InputError class="mt-2" :message="form.errors.event_id" />
                 </div>
 
-                <div>
+                <div v-if="!selectedFiles.length">
                     <InputLabel for="photos" value="File Foto" />
                     <label
                         for="photos"
@@ -135,16 +145,27 @@ const submit = () => {
 
                 <div v-if="selectedFiles.length" class="rounded-lg border border-border">
                     <div class="flex items-center justify-between border-b border-border px-4 py-3">
-                        <p class="text-sm font-semibold text-ink">{{ selectedFiles.length }} file dipilih</p>
-                        <p class="text-sm text-ink-muted">Siap upload</p>
+                        <div>
+                            <p class="text-sm font-semibold text-ink">{{ selectedFiles.length }} file dipilih</p>
+                            <p class="mt-1 text-xs text-ink-muted">Siap upload</p>
+                        </div>
                     </div>
                     <ul class="max-h-72 divide-y divide-border overflow-y-auto">
-                        <li v-for="file in selectedFiles" :key="`${file.name}-${file.size}`" class="flex items-center gap-3 px-4 py-3">
+                        <li v-for="(file, index) in selectedFiles" :key="`${file.name}-${file.size}`" class="flex items-center gap-3 px-4 py-3">
                             <FileImage class="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
                             <div class="min-w-0 flex-1">
                                 <p class="truncate text-sm font-semibold text-ink" :title="file.name">{{ file.name }}</p>
                                 <p class="mt-1 text-xs text-ink-muted">{{ formatBytes(file.size) }} - {{ file.type }}</p>
                             </div>
+                            <button
+                                type="button"
+                                class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-white text-ink-muted transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
+                                :aria-label="`Hapus ${file.name}`"
+                                :title="`Hapus ${file.name}`"
+                                @click="removeFile(index)"
+                            >
+                                <X class="h-4 w-4" aria-hidden="true" />
+                            </button>
                         </li>
                     </ul>
                 </div>

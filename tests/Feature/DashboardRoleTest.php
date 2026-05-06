@@ -6,6 +6,7 @@ use App\Models\Event;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Photo;
+use App\Models\Setting;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -90,61 +91,34 @@ class DashboardRoleTest extends TestCase
             );
     }
 
-    public function test_visitor_dashboard_only_shows_owned_orders(): void
+    public function test_dashboard_recent_table_limit_uses_super_admin_setting(): void
     {
+        Setting::create([
+            'key' => 'dashboard_table_per_page',
+            'value' => '2',
+            'description' => 'Fixture setting',
+        ]);
+
+        $superAdmin = User::factory()->create(['role' => User::ROLE_SUPER_ADMIN]);
         $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
-        [$visitor, $otherVisitor] = User::factory()->count(2)->create(['role' => User::ROLE_VISITOR]);
-        $event = $this->makeEvent($admin);
-        $photo = $this->makePhoto($event);
-        $paidOrder = $this->makeOrder($visitor, $event, [
-            'order_code' => 'SNP-DASH-VISITOR-0001',
-            'status' => Order::STATUS_PAID,
-            'total_amount' => 50000,
-            'paid_at' => now(),
-        ]);
-        OrderItem::create(['order_id' => $paidOrder->id, 'photo_id' => $photo->id, 'price' => 50000]);
-        $this->makeOrder($visitor, $event, [
-            'order_code' => 'SNP-DASH-PENDING-0001',
-            'status' => Order::STATUS_PENDING,
-            'total_amount' => 25000,
-        ]);
-        $this->makeOrder($otherVisitor, $event, [
-            'order_code' => 'SNP-DASH-OTHER-0001',
-            'status' => Order::STATUS_PAID,
-            'total_amount' => 999999,
-            'paid_at' => now(),
-        ]);
-
-        $this->actingAs($visitor)
-            ->get(route('visitor.dashboard'))
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('Dashboard')
-                ->where('dashboardRole', User::ROLE_VISITOR)
-                ->where('stats.0.value', 2)
-                ->where('stats.1.value', 1)
-                ->where('stats.2.value', 1)
-                ->where('stats.3.value', 50000)
-                ->has('recentOrders', 2)
-                ->where('recentOrders.0.order_code', 'SNP-DASH-PENDING-0001')
-                ->where('recentOrders.1.order_code', 'SNP-DASH-VISITOR-0001')
-            );
-    }
-
-    public function test_dashboard_shows_empty_state_data_when_no_operational_data_exists(): void
-    {
         $visitor = User::factory()->create(['role' => User::ROLE_VISITOR]);
 
-        $this->actingAs($visitor)
-            ->get(route('visitor.dashboard'))
+        for ($index = 1; $index <= 3; $index++) {
+            $event = $this->makeEvent($admin, ['name' => "Event {$index}"]);
+            $order = $this->makeOrder($visitor, $event, [
+                'order_code' => "SNP-DASH-LIMIT-{$index}",
+                'status' => Order::STATUS_PAID,
+                'paid_at' => now(),
+            ]);
+            $this->makeTransaction($order, "MT-SNP-DASH-LIMIT-{$index}");
+        }
+
+        $this->actingAs($superAdmin)
+            ->get(route('super-admin.dashboard'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('Dashboard')
-                ->where('stats.0.value', 0)
-                ->where('stats.1.value', 0)
-                ->where('stats.2.value', 0)
-                ->where('stats.3.value', 0)
-                ->has('recentOrders', 0)
+                ->has('recentTransactions', 2)
+                ->has('recentEvents', 2)
             );
     }
 

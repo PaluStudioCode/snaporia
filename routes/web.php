@@ -11,6 +11,8 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicEventController;
 use App\Http\Controllers\PublicGalleryController;
 use App\Http\Controllers\PublicPhotoController;
+use App\Http\Controllers\SuperAdmin\EventMonitoringController as SuperAdminEventMonitoringController;
+use App\Http\Controllers\SuperAdmin\PhotoMonitoringController as SuperAdminPhotoMonitoringController;
 use App\Http\Controllers\SuperAdmin\SettingController as SuperAdminSettingController;
 use App\Http\Controllers\SuperAdmin\TransactionController as SuperAdminTransactionController;
 use App\Http\Controllers\SuperAdmin\UserManagementController;
@@ -37,13 +39,15 @@ Route::get('/events/{event}', [PublicEventController::class, 'show'])->name('eve
 
 Route::get('/gallery', [PublicGalleryController::class, 'index'])->name('gallery.index');
 Route::get('/photos/{photo}/watermarked', [PublicPhotoController::class, 'watermarked'])->name('public.photos.watermarked');
+Route::get('/photos/{photo}/preview', [PublicPhotoController::class, 'preview'])->name('public.photos.preview');
+Route::get('/photos/{photo}/download', [PublicPhotoController::class, 'download'])->name('public.photos.download');
 Route::post('/payment/midtrans/notification', [PaymentController::class, 'notification'])->name('payment.midtrans.notification');
 
 Route::get('/dashboard', function (): RedirectResponse {
     return match (request()->user()->role) {
         User::ROLE_SUPER_ADMIN => redirect()->route('super-admin.dashboard'),
         User::ROLE_ADMIN => redirect()->route('admin.dashboard'),
-        default => redirect()->route('visitor.dashboard'),
+        default => redirect()->route('events.index'),
     };
 })->middleware(['auth', 'active', 'verified'])->name('dashboard');
 
@@ -60,6 +64,10 @@ Route::middleware(['auth', 'active', 'verified'])->group(function () {
         Route::put('/users/{user}', [UserManagementController::class, 'update'])->name('users.update');
         Route::patch('/users/{user}/deactivate', [UserManagementController::class, 'deactivate'])->name('users.deactivate');
         Route::delete('/users/{user}', [UserManagementController::class, 'destroy'])->name('users.destroy');
+
+        Route::get('/events', [SuperAdminEventMonitoringController::class, 'index'])->name('events.index');
+        Route::get('/photos', [SuperAdminPhotoMonitoringController::class, 'index'])->name('photos.index');
+        Route::get('/photos/{photo}/preview', [SuperAdminPhotoMonitoringController::class, 'preview'])->name('photos.preview');
 
         Route::get('/transactions', [SuperAdminTransactionController::class, 'index'])->name('transactions.index');
         Route::get('/transactions/{transaction}', [SuperAdminTransactionController::class, 'show'])->name('transactions.show');
@@ -94,10 +102,6 @@ Route::middleware(['auth', 'active', 'verified'])->group(function () {
         Route::get('/transactions/{transaction}', [AdminTransactionController::class, 'show'])->name('transactions.show');
         Route::get('/reports/sales', [AdminSalesReportController::class, 'index'])->name('reports.sales');
     });
-
-    Route::get('/visitor/dashboard', [DashboardController::class, 'visitor'])
-        ->middleware('role:visitor')
-        ->name('visitor.dashboard');
 
     Route::middleware('role:visitor')->prefix('checkout')->name('checkout.')->group(function () {
         Route::get('/single', [CheckoutController::class, 'single'])->name('single.show');
